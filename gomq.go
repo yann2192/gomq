@@ -244,3 +244,10 @@ func (self *GOMQ) decrypt(buff []byte) ([]byte, error) {
 	}
 	return plaintext, nil
 }
+
+func (self *GOMQ) Close() {
+	for _, sock_infos := range self.connections {
+		sock_infos.Sock.Close()
+	}
+	self.context.Close()
+}

@@ -20,6 +20,7 @@ func Server() {
 	if err != nil {
 		log.Println(err)
 	}
+	h.Close()
 }
 
 func main() {

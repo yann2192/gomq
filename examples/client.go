@@ -21,6 +21,7 @@ func Client() {
 	if err != nil {
 		log.Println("Client:SendJob", err)
 	}
+	h.Close()
 }
 
 func main() {

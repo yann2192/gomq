@@ -34,6 +34,7 @@ Daemon
         if err != nil {
             log.Println(err)
         }
+        h.Close()
     }
 
     func main() {
@@ -59,6 +60,7 @@ Client
         if err != nil {
             log.Println("Client:SendJob", err)
         }
+        h.Close()
     }
 
     func main() {

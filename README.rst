@@ -5,6 +5,12 @@ GOMQ
 GOMQ, a fast and lightweight distributed Messaging/Task Queue using ØMQ and some
 cryptography.
 
+TODO
+====
+    * Documentation
+    * Tests
+    * More examples
+
 Example
 =======
 

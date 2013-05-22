@@ -2,7 +2,7 @@
 GOMQ
 ====
 
-GOMQ, a fast and lightweight distributed Messaging Queue using ØMQ and some
+GOMQ, a fast and lightweight distributed Messaging/Task Queue using ØMQ and some
 cryptography.
 
 Example

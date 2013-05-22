@@ -13,7 +13,7 @@ import (
 	"io"
 )
 
-func EncodeMessage(data *Message) ([]byte, error) {
+func encodeMessage(data *_Message) ([]byte, error) {
 	var buffer bytes.Buffer
 	encoder := gob.NewEncoder(&buffer)
 	err := encoder.Encode(*data)
@@ -23,9 +23,9 @@ func EncodeMessage(data *Message) ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-func DecodeMessage(data []byte) (*Message, error) {
+func decodeMessage(data []byte) (*_Message, error) {
 	var buffer bytes.Buffer
-	res := new(Message)
+	res := new(_Message)
 	buffer.Write(data)
 	decoder := gob.NewDecoder(&buffer)
 	err := decoder.Decode(res)

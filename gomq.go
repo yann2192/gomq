@@ -15,19 +15,19 @@ import (
 )
 
 const (
-	PULL = zmq.PULL
-	PUSH = zmq.PUSH
-	SALT = "\x0c\x199\xe5yn\xe8\xa1"
+	PULL  = zmq.PULL
+	PUSH  = zmq.PUSH
+	_SALT = "\x0c\x199\xe5yn\xe8\xa1"
 )
 
-type connectionInfo struct {
+type _ConnectionInfo struct {
 	Host *list.List
 	Type zmq.SocketType
 	Sock *zmq.Socket
 }
 
-func newConnectionInfo(host string, _type zmq.SocketType) *connectionInfo {
-	res := &connectionInfo{Type: _type, Sock: nil}
+func newConnectionInfo(host string, _type zmq.SocketType) *_ConnectionInfo {
+	res := &_ConnectionInfo{Type: _type, Sock: nil}
 	res.Host = list.New()
 	res.Host.PushBack(host)
 	return res
@@ -36,22 +36,22 @@ func newConnectionInfo(host string, _type zmq.SocketType) *connectionInfo {
 type Args interface{}
 type Pfunc func(Args)
 
-type Message struct {
+type _Message struct {
 	Job,
 	UUID string
 	Params   Args
 	Priority uint
 }
 
-func newMessage(job, uuid string, params Args, priority uint) *Message {
-	return &Message{job, uuid, params, priority}
+func newMessage(job, uuid string, params Args, priority uint) *_Message {
+	return &_Message{job, uuid, params, priority}
 }
 
 type GOMQ struct {
 	uuid        string
 	context     *zmq.Context
 	jobs        map[string]Pfunc
-	connections map[string]*connectionInfo
+	connections map[string]*_ConnectionInfo
 	pool        chan byte
 	key         []byte
 	Run         bool
@@ -60,15 +60,11 @@ type GOMQ struct {
 func NewGOMQ(uuid string) *GOMQ {
 	res := &GOMQ{uuid: uuid}
 	res.jobs = map[string]Pfunc{}
-	res.connections = map[string]*connectionInfo{}
+	res.connections = map[string]*_ConnectionInfo{}
 	res.context, _ = zmq.NewContext()
 	res.pool = nil
 	res.key = nil
 	return res
-}
-
-func (self *GOMQ) Jobs() map[string]Pfunc {
-	return self.jobs
 }
 
 func (self *GOMQ) CreatePool(size int) {
@@ -76,7 +72,7 @@ func (self *GOMQ) CreatePool(size int) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 }
 
-func (self *GOMQ) createSock(sock_infos *connectionInfo) (*zmq.Socket, error) {
+func (self *GOMQ) createSock(sock_infos *_ConnectionInfo) (*zmq.Socket, error) {
 	if sock_infos.Sock == nil {
 		sock, err := self.context.NewSocket(sock_infos.Type)
 		if err != nil {
@@ -106,18 +102,18 @@ func (self *GOMQ) SendJob(connection_name, job string, params Args) error {
 		return err
 	}
 	sock_infos := self.connections[connection_name]
-	sock, err2 := self.createSock(sock_infos)
-	if err2 != nil {
-		return err2
+	sock, err := self.createSock(sock_infos)
+	if err != nil {
+		return err
 	}
 	msg := newMessage(job, uuid, params, 0)
-	buff, err3 := EncodeMessage(msg)
-	if err3 != nil {
-		return err3
+	buff, err := encodeMessage(msg)
+	if err != nil {
+		return err
 	}
-	buff, err3 = self.encrypt(buff)
-	if err3 != nil {
-		return err3
+	buff, err = self.encrypt(buff)
+	if err != nil {
+		return err
 	}
 	for i := 0; i < len(buff); i += 4096 {
 		limit := i + 4096
@@ -142,9 +138,9 @@ func (self *GOMQ) handle(buff []byte) {
 		log.Println("GOMQ:handle:decrypt", err)
 		return
 	}
-	msg, err2 := DecodeMessage(buff)
-	if err2 != nil {
-		log.Println("GOMQ:handle:DecodeMessage", err2)
+	msg, err := decodeMessage(buff)
+	if err != nil {
+		log.Println("GOMQ:handle:decodeMessage", err)
 	} else {
 		job := self.getJob(msg.Job)
 		job(msg.Params)
@@ -182,7 +178,7 @@ func (self *GOMQ) getJob(job string) Pfunc {
 }
 
 func (self *GOMQ) SetMasterKey(key []byte) {
-	_, self.key = PBKDF2_SHA256(key, []byte(SALT))
+	_, self.key = _PBKDF2_SHA256(key, []byte(_SALT))
 }
 
 func (self *GOMQ) encrypt(data []byte) ([]byte, error) {
@@ -190,24 +186,24 @@ func (self *GOMQ) encrypt(data []byte) ([]byte, error) {
 	if self.key == nil {
 		return nil, errors.New("GOMQ:encrypt:Master Key is not define")
 	}
-	iv := Rand(BlockSizeAES())
+	iv := _rand(blockSizeAES())
 	_, err := buffer.Write(iv)
 	if err != nil {
 		return nil, err
 	}
-	ctx, err2 := NewAES(self.key, iv)
-	if err2 != nil {
-		return nil, err2
+	ctx, err := newAES(self.key, iv)
+	if err != nil {
+		return nil, err
 	}
-	ciphertext := ctx.Update(data)
-	_, err3 := buffer.Write(ciphertext)
-	if err3 != nil {
-		return nil, err3
+	ciphertext := ctx.update(data)
+	_, err = buffer.Write(ciphertext)
+	if err != nil {
+		return nil, err
 	}
-	hmac := HMAC_SHA256(data, self.key)
-	_, err4 := buffer.Write(hmac)
-	if err4 != nil {
-		return nil, err4
+	hmac := _HMAC_SHA256(data, self.key)
+	_, err = buffer.Write(hmac)
+	if err != nil {
+		return nil, err
 	}
 	return buffer.Bytes(), nil
 }
@@ -218,7 +214,7 @@ func (self *GOMQ) decrypt(buff []byte) ([]byte, error) {
 	}
 	length := len(buff)
 	buffer := bytes.NewBuffer(buff)
-	iv := make([]byte, BlockSizeAES())
+	iv := make([]byte, blockSizeAES())
 	hmac := make([]byte, 32)
 	data := make([]byte, length-(len(iv)+len(hmac)))
 	i, err := buffer.Read(iv)
@@ -233,12 +229,12 @@ func (self *GOMQ) decrypt(buff []byte) ([]byte, error) {
 	if err != nil || i < len(iv) {
 		return nil, err
 	}
-	ctx, err2 := NewAES(self.key, iv)
-	if err2 != nil {
-		return nil, err2
+	ctx, err := newAES(self.key, iv)
+	if err != nil {
+		return nil, err
 	}
-	plaintext := ctx.Update(data)
-	hmac2 := HMAC_SHA256(plaintext, self.key)
+	plaintext := ctx.update(data)
+	hmac2 := _HMAC_SHA256(plaintext, self.key)
 	if !bytes.Equal(hmac, hmac2) {
 		return nil, errors.New("GOMQ:decrypt:HMAC check fail")
 	}

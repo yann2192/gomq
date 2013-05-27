@@ -80,7 +80,10 @@ func (self *GOMQ) createSock(sock_infos *_ConnectionInfo) (*zmq.Socket, error) {
 			return nil, err
 		}
 		for e := sock_infos.Host.Front(); e != nil; e = e.Next() {
-			sock.Connect(e.Value.(string))
+			err := sock.Connect(e.Value.(string))
+			if err != nil {
+				return nil, err
+			}
 		}
 		sock_infos.Sock = sock
 		return sock, nil

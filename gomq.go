@@ -297,5 +297,9 @@ func (self *GOMQ) Close() {
 	for _, sock_infos := range self.connections {
 		sock_infos.Sock.Close()
 	}
+	if self.localsock != nil {
+		self.localsock.Close()
+		self.localsock = nil
+	}
 	self.context.Close()
 }

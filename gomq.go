@@ -54,6 +54,7 @@ type GOMQ struct {
 	connections map[string]*_ConnectionInfo
 	pool        chan byte
 	key         []byte
+	localsock   *zmq.Socket
 	Run         bool
 }
 
@@ -129,22 +130,56 @@ func (self *GOMQ) SendJob(connection_name, job string, params Args) error {
 	return err
 }
 
+func (self *GOMQ) SendLocalJob(job string, params Args) error {
+	if self.localsock == nil {
+		return errors.New("GOMQ:SendLocalJob:daemon is not start")
+	}
+	uuid, err := newUUID()
+	if err != nil {
+		return err
+	}
+	msg := newMessage(job, uuid, params, 0)
+	buff, err := encodeMessage(msg)
+	if err != nil {
+		return err
+	}
+	buff, err = self.encrypt(buff)
+	if err != nil {
+		return err
+	}
+	for i := 0; i < len(buff); i += 4096 {
+		limit := i + 4096
+		if limit > len(buff) {
+			limit = len(buff)
+		}
+		err = self.localsock.Send(buff[i:limit], zmq.SNDMORE)
+		if err != nil {
+			return err
+		}
+	}
+	err = self.localsock.Send([]byte(nil), 0)
+	return err
+}
+
 func (self *GOMQ) handle(buff []byte) {
-	defer func() {
-		<-self.pool
+	self.pool <- '0'
+	go func() {
+		defer func() {
+			<-self.pool
+		}()
+		buff, err := self.decrypt(buff)
+		if err != nil {
+			log.Println("GOMQ:handle:decrypt", err)
+			return
+		}
+		msg, err := decodeMessage(buff)
+		if err != nil {
+			log.Println("GOMQ:handle:decodeMessage", err)
+		} else {
+			job := self.getJob(msg.Job)
+			job(msg.Params)
+		}
 	}()
-	buff, err := self.decrypt(buff)
-	if err != nil {
-		log.Println("GOMQ:handle:decrypt", err)
-		return
-	}
-	msg, err := decodeMessage(buff)
-	if err != nil {
-		log.Println("GOMQ:handle:decodeMessage", err)
-	} else {
-		job := self.getJob(msg.Job)
-		job(msg.Params)
-	}
 }
 
 func (self *GOMQ) Loop(host string, sock_type zmq.SocketType) error {
@@ -155,7 +190,22 @@ func (self *GOMQ) Loop(host string, sock_type zmq.SocketType) error {
 	if err != nil {
 		return err
 	}
-	s.Bind(host)
+	err = s.Bind(host)
+	if err != nil {
+		return err
+	}
+	err = s.Bind("ipc://GOMQ:" + self.uuid)
+	if err != nil {
+		return err
+	}
+	self.localsock, err = self.context.NewSocket(zmq.PUSH)
+	if err != nil {
+		return err
+	}
+	err = self.localsock.Connect("ipc://GOMQ:" + self.uuid)
+	if err != nil {
+		return err
+	}
 	self.Run = true
 	for self.Run {
 		buff, err := s.RecvMultipart(zmq.SNDMORE)
@@ -163,8 +213,7 @@ func (self *GOMQ) Loop(host string, sock_type zmq.SocketType) error {
 			log.Println("GOMQ:Loop:RecvMultipart", err)
 			continue
 		}
-		self.pool <- '0'
-		go self.handle(bytes.Join(buff, []byte(nil)))
+		self.handle(bytes.Join(buff, []byte(nil)))
 	}
 	return nil
 }

@@ -52,25 +52,18 @@ type GOMQ struct {
 	context     *zmq.Context
 	jobs        map[string]Pfunc
 	connections map[string]*_ConnectionInfo
-	pool        chan byte
 	key         []byte
-	localsock   *zmq.Socket
 	Run         bool
 }
 
 func NewGOMQ(uuid string) *GOMQ {
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	res := &GOMQ{uuid: uuid}
 	res.jobs = map[string]Pfunc{}
 	res.connections = map[string]*_ConnectionInfo{}
 	res.context, _ = zmq.NewContext()
-	res.pool = nil
 	res.key = nil
 	return res
-}
-
-func (self *GOMQ) CreatePool(size int) {
-	self.pool = make(chan byte, size)
-	runtime.GOMAXPROCS(runtime.NumCPU())
 }
 
 func (self *GOMQ) createSock(sock_infos *_ConnectionInfo) (*zmq.Socket, error) {
@@ -133,79 +126,27 @@ func (self *GOMQ) SendJob(connection_name, job string, params Args) error {
 	return err
 }
 
-func (self *GOMQ) SendLocalJob(job string, params Args) error {
-	if self.localsock == nil {
-		return errors.New("GOMQ:SendLocalJob:daemon is not start")
-	}
-	uuid, err := newUUID()
-	if err != nil {
-		return err
-	}
-	msg := newMessage(job, uuid, params, 0)
-	buff, err := encodeMessage(msg)
-	if err != nil {
-		return err
-	}
-	buff, err = self.encrypt(buff)
-	if err != nil {
-		return err
-	}
-	for i := 0; i < len(buff); i += 4096 {
-		limit := i + 4096
-		if limit > len(buff) {
-			limit = len(buff)
-		}
-		err = self.localsock.Send(buff[i:limit], zmq.SNDMORE)
-		if err != nil {
-			return err
-		}
-	}
-	err = self.localsock.Send([]byte(nil), 0)
-	return err
-}
-
 func (self *GOMQ) handle(buff []byte) {
-	self.pool <- '0'
-	go func() {
-		defer func() {
-			<-self.pool
-		}()
-		buff, err := self.decrypt(buff)
-		if err != nil {
-			log.Println("GOMQ:handle:decrypt", err)
-			return
-		}
-		msg, err := decodeMessage(buff)
-		if err != nil {
-			log.Println("GOMQ:handle:decodeMessage", err)
-		} else {
-			job := self.getJob(msg.Job)
-			job(msg.Params)
-		}
-	}()
+	buff, err := self.decrypt(buff)
+	if err != nil {
+		log.Println("GOMQ:handle:decrypt", err)
+		return
+	}
+	msg, err := decodeMessage(buff)
+	if err != nil {
+		log.Println("GOMQ:handle:decodeMessage", err)
+	} else {
+		job := self.getJob(msg.Job)
+		job(msg.Params)
+	}
 }
 
 func (self *GOMQ) Loop(host string, sock_type zmq.SocketType) error {
-	if self.pool == nil {
-		return errors.New("GOMQ:Loop:Pool not created")
-	}
 	s, err := self.context.NewSocket(sock_type)
 	if err != nil {
 		return err
 	}
 	err = s.Bind(host)
-	if err != nil {
-		return err
-	}
-	err = s.Bind("ipc://GOMQ:" + self.uuid)
-	if err != nil {
-		return err
-	}
-	self.localsock, err = self.context.NewSocket(zmq.PUSH)
-	if err != nil {
-		return err
-	}
-	err = self.localsock.Connect("ipc://GOMQ:" + self.uuid)
 	if err != nil {
 		return err
 	}
@@ -216,7 +157,7 @@ func (self *GOMQ) Loop(host string, sock_type zmq.SocketType) error {
 			log.Println("GOMQ:Loop:RecvMultipart", err)
 			continue
 		}
-		self.handle(bytes.Join(buff, []byte(nil)))
+		go self.handle(bytes.Join(buff, []byte(nil)))
 	}
 	return nil
 }
@@ -296,10 +237,6 @@ func (self *GOMQ) decrypt(buff []byte) ([]byte, error) {
 func (self *GOMQ) Close() {
 	for _, sock_infos := range self.connections {
 		sock_infos.Sock.Close()
-	}
-	if self.localsock != nil {
-		self.localsock.Close()
-		self.localsock = nil
 	}
 	self.context.Close()
 }

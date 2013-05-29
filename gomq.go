@@ -11,7 +11,11 @@ import (
 	"errors"
 	zmq "github.com/alecthomas/gozmq"
 	"log"
+	"os"
+	"os/signal"
 	"runtime"
+	"syscall"
+	"time"
 )
 
 const (
@@ -150,15 +154,28 @@ func (self *GOMQ) Loop(host string, sock_type zmq.SocketType) error {
 	if err != nil {
 		return err
 	}
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, os.Kill, os.Signal(syscall.SIGTERM))
+	go func() {
+		<-c
+		self.Run = false
+		signal.Stop(c)
+	}()
+
 	self.Run = true
 	for self.Run {
 		buff, err := s.RecvMultipart(zmq.SNDMORE)
 		if err != nil {
 			log.Println("GOMQ:Loop:RecvMultipart", err)
+			time.Sleep(time.Millisecond)
 			continue
 		}
 		go self.handle(bytes.Join(buff, []byte(nil)))
 	}
+
+	s.Close()
+	log.Println("GOMQ:Loop:Exiting")
 	return nil
 }
 
@@ -237,6 +254,7 @@ func (self *GOMQ) decrypt(buff []byte) ([]byte, error) {
 func (self *GOMQ) Close() {
 	for _, sock_infos := range self.connections {
 		sock_infos.Sock.Close()
+		sock_infos.Sock = nil
 	}
 	self.context.Close()
 }

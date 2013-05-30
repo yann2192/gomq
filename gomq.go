@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -57,6 +58,7 @@ type GOMQ struct {
 	jobs        map[string]Pfunc
 	connections map[string]*_ConnectionInfo
 	key         []byte
+	lock        sync.WaitGroup
 	Run         bool
 }
 
@@ -146,6 +148,8 @@ func (self *GOMQ) handle(buff []byte) {
 }
 
 func (self *GOMQ) Loop(host string, sock_type zmq.SocketType) error {
+	self.AddWorker()
+	defer self.FreeWorker()
 	s, err := self.context.NewSocket(sock_type)
 	if err != nil {
 		return err
@@ -257,4 +261,16 @@ func (self *GOMQ) Close() {
 		sock_infos.Sock = nil
 	}
 	self.context.Close()
+}
+
+func (self *GOMQ) AddWorker() {
+	self.lock.Add(1)
+}
+
+func (self *GOMQ) FreeWorker() {
+	self.lock.Done()
+}
+
+func (self *GOMQ) Wait() {
+	self.lock.Wait()
 }

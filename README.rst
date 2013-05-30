@@ -26,20 +26,25 @@ Daemon
         "time"
     )
 
+    var _GOMQ *gomq.GOMQ
+
     func a(b gomq.Args) {
+        _GOMQ.AddWorker()
+        defer _GOMQ.FreeWorker()
         log.Println(">", b.(string), "<")
         time.Sleep(time.Second)
     }
 
     func Server() {
-        h := gomq.NewGOMQ("daemon")
-        h.SetMasterKey([]byte("test"))
-        h.AddJob("test", a)
-        err := h.Loop("tcp://127.0.0.1:6666", gomq.PULL)
+        _GOMQ = gomq.NewGOMQ("daemon")
+        _GOMQ.SetMasterKey([]byte("test"))
+        _GOMQ.AddJob("test", a)
+        err := _GOMQ.Loop("tcp://127.0.0.1:6666", gomq.PULL)
         if err != nil {
             log.Println(err)
         }
-        h.Close()
+        _GOMQ.Close()
+        _GOMQ.Wait()
     }
 
     func main() {

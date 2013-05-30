@@ -3,7 +3,6 @@
     See LICENSE for details.
 **/
 
-// A fast and lightweight distributed Task Queue using ØMQ.
 package gomq
 
 import (
@@ -63,10 +62,7 @@ func newMessage(job, uuid string, params Args, priority uint) *_Message {
 	return &_Message{job, uuid, params, priority}
 }
 
-// a GOMQ instance contain defined task identified by a string. It can bind like
-// a daemon or connect to others daemons (or both). GOMQ use only encrypted
-// connections using AES. All incoming or outcoming connections are ØMQ connections
-// so a connection must only send (using gomq.PUSH) or receive (using gomq.PULL).
+// GOMQ structure.
 type GOMQ struct {
 	uuid        string                      // To identify a GOMQ instance. Not using yet.
 	context     *zmq.Context                // A ØMQ context.

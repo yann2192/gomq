@@ -3,6 +3,7 @@
     See LICENSE for details.
 **/
 
+// A fast and lightweight distributed Task Queue using ØMQ.
 package gomq
 
 import (
@@ -20,17 +21,22 @@ import (
 )
 
 const (
-	PULL  = zmq.PULL
-	PUSH  = zmq.PUSH
-	_SALT = "\x0c\x199\xe5yn\xe8\xa1"
+	// Export ØMQ socket type.
+	PULL = zmq.PULL
+	PUSH = zmq.PUSH
+
+	_SALT = "\x0c\x199\xe5yn\xe8\xa1" // SALT using for derivate the master key
 )
 
+// Contain informations for a GOMQ connection. A GOMQ connection can handle
+// many host.
 type _ConnectionInfo struct {
 	Host *list.List
 	Type zmq.SocketType
 	Sock *zmq.Socket
 }
 
+// Create and initialize a new _ConnectionInfo.
 func newConnectionInfo(host string, _type zmq.SocketType) *_ConnectionInfo {
 	res := &_ConnectionInfo{Type: _type, Sock: nil}
 	res.Host = list.New()
@@ -38,30 +44,40 @@ func newConnectionInfo(host string, _type zmq.SocketType) *_ConnectionInfo {
 	return res
 }
 
+// Type to describe the argument of a GOMQ task.
 type Args interface{}
+
+// Type to describe a GOMQ task.
 type Pfunc func(Args)
 
+// Contain all informations to launch a task.
 type _Message struct {
-	Job,
-	UUID string
+	Job      string
+	UUID     string // Not using yet.
 	Params   Args
-	Priority uint
+	Priority uint // Not using yet.
 }
 
+// Create and initialize a new _Message.
 func newMessage(job, uuid string, params Args, priority uint) *_Message {
 	return &_Message{job, uuid, params, priority}
 }
 
+// a GOMQ instance contain defined task identified by a string. It can bind like
+// a daemon or connect to others daemons (or both). GOMQ use only encrypted
+// connections using AES. All incoming or outcoming connections are ØMQ connections
+// so a connection must only send (using gomq.PUSH) or receive (using gomq.PULL).
 type GOMQ struct {
-	uuid        string
-	context     *zmq.Context
-	jobs        map[string]Pfunc
-	connections map[string]*_ConnectionInfo
-	key         []byte
-	lock        sync.WaitGroup
-	Run         bool
+	uuid        string                      // To identify a GOMQ instance. Not using yet.
+	context     *zmq.Context                // A ØMQ context.
+	jobs        map[string]Pfunc            // Contain defined task.
+	connections map[string]*_ConnectionInfo // Contain created connection.
+	key         []byte                      // Using to encryption.
+	lock        sync.WaitGroup              // Using to wait running goroutine.
+	run         bool                        // Using for the principal loop.
 }
 
+// Create and initialize a new GOMQ instance identified by the given uuid.
 func NewGOMQ(uuid string) *GOMQ {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	res := &GOMQ{uuid: uuid}
@@ -72,6 +88,7 @@ func NewGOMQ(uuid string) *GOMQ {
 	return res
 }
 
+// Create a new connection with the host and identified by the given name.
 func (self *GOMQ) CreateConnection(name, host string, sock_type zmq.SocketType) {
 	if self.connections[name] == nil {
 		self.connections[name] = newConnectionInfo(host, sock_type)
@@ -80,14 +97,18 @@ func (self *GOMQ) CreateConnection(name, host string, sock_type zmq.SocketType) 
 	}
 }
 
+// Define a new job identified by the string job.
 func (self *GOMQ) AddJob(job string, action Pfunc) {
 	self.jobs[job] = action
 }
 
+// Define the master key using for encryption.
 func (self *GOMQ) SetMasterKey(key []byte) {
 	_, self.key = _PBKDF2_SHA256(key, []byte(_SALT))
 }
 
+// Send a job on the connection identified by connection_name to execute the
+// task identified by the strnig job which will take params to argument.
 func (self *GOMQ) SendJob(connection_name, job string, params Args) error {
 	uuid, err := newUUID()
 	if err != nil {
@@ -137,12 +158,12 @@ func (self *GOMQ) Loop(host string, sock_type zmq.SocketType) error {
 	signal.Notify(c, os.Interrupt, os.Kill, os.Signal(syscall.SIGTERM))
 	go func() {
 		<-c
-		self.Run = false
+		self.run = false
 		signal.Stop(c)
 	}()
 
-	self.Run = true
-	for self.Run {
+	self.run = true
+	for self.run {
 		buff, err := s.RecvMultipart(zmq.SNDMORE)
 		if err != nil {
 			log.Println("GOMQ:Loop:RecvMultipart", err)

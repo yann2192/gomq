@@ -6,12 +6,12 @@
 package gomq
 
 import (
+	"code.google.com/p/go.crypto/pbkdf2"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
-	"gomq/crypto/pbkdf2"
 )
 
 type _AES struct {

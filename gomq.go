@@ -157,7 +157,7 @@ func (self *GOMQ) Loop(host string, sock_type zmq.SocketType) error {
 		return err
 	}
 
-    // Receive killing signals.
+	// Receive killing signals.
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, os.Kill, os.Signal(syscall.SIGTERM))
 	go func() {

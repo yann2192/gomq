@@ -87,3 +87,4 @@ Client
 Requirements
 ============
     * gozmq (https://github.com/alecthomas/gozmq)
+    * pbkdf2 (https://code.google.com/p/go.crypto/pbkdf2)

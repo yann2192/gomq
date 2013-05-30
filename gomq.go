@@ -206,6 +206,7 @@ func (self *GOMQ) Wait() {
 	self.lock.Wait()
 }
 
+// Handle received messages and execute associated task.
 func (self *GOMQ) handle(buff []byte) {
 	buff, err := self.decrypt(buff)
 	if err != nil {
@@ -221,16 +222,19 @@ func (self *GOMQ) handle(buff []byte) {
 	}
 }
 
+// Retrieved the job associated to the given string.
 func (self *GOMQ) getJob(job string) Pfunc {
 	return self.jobs[job]
 }
 
+// Create a ØMQ socket (if he doesn't already exist) with the given socket info.
 func (self *GOMQ) createSock(sock_infos *_ConnectionInfo) (*zmq.Socket, error) {
 	if sock_infos.Sock == nil {
 		sock, err := self.context.NewSocket(sock_infos.Type)
 		if err != nil {
 			return nil, err
 		}
+        // Connect to each hosts.
 		for e := sock_infos.Host.Front(); e != nil; e = e.Next() {
 			err := sock.Connect(e.Value.(string))
 			if err != nil {
@@ -244,6 +248,7 @@ func (self *GOMQ) createSock(sock_infos *_ConnectionInfo) (*zmq.Socket, error) {
 	}
 }
 
+// Encrypt given buffer and generate an hmac.
 func (self *GOMQ) encrypt(data []byte) ([]byte, error) {
 	var buffer bytes.Buffer
 	if self.key == nil {
@@ -271,6 +276,7 @@ func (self *GOMQ) encrypt(data []byte) ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
+// Decrypt given buffer and verify the hmac.
 func (self *GOMQ) decrypt(buff []byte) ([]byte, error) {
 	if self.key == nil {
 		return nil, errors.New("GOMQ:encrypt:Master Key is not define")

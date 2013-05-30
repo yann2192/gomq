@@ -13,6 +13,7 @@ import (
 	"io"
 )
 
+// Encode a struct _Message in binary
 func encodeMessage(data *_Message) ([]byte, error) {
 	var buffer bytes.Buffer
 	encoder := gob.NewEncoder(&buffer)
@@ -23,6 +24,7 @@ func encodeMessage(data *_Message) ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
+// Decode a encoded _Message
 func decodeMessage(data []byte) (*_Message, error) {
 	var buffer bytes.Buffer
 	res := new(_Message)

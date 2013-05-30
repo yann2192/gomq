@@ -72,31 +72,20 @@ func NewGOMQ(uuid string) *GOMQ {
 	return res
 }
 
-func (self *GOMQ) createSock(sock_infos *_ConnectionInfo) (*zmq.Socket, error) {
-	if sock_infos.Sock == nil {
-		sock, err := self.context.NewSocket(sock_infos.Type)
-		if err != nil {
-			return nil, err
-		}
-		for e := sock_infos.Host.Front(); e != nil; e = e.Next() {
-			err := sock.Connect(e.Value.(string))
-			if err != nil {
-				return nil, err
-			}
-		}
-		sock_infos.Sock = sock
-		return sock, nil
-	} else {
-		return sock_infos.Sock, nil
-	}
-}
-
 func (self *GOMQ) CreateConnection(name, host string, sock_type zmq.SocketType) {
 	if self.connections[name] == nil {
 		self.connections[name] = newConnectionInfo(host, sock_type)
 	} else {
 		self.connections[name].Host.PushBack(host)
 	}
+}
+
+func (self *GOMQ) AddJob(job string, action Pfunc) {
+	self.jobs[job] = action
+}
+
+func (self *GOMQ) SetMasterKey(key []byte) {
+	_, self.key = _PBKDF2_SHA256(key, []byte(_SALT))
 }
 
 func (self *GOMQ) SendJob(connection_name, job string, params Args) error {
@@ -130,21 +119,6 @@ func (self *GOMQ) SendJob(connection_name, job string, params Args) error {
 	}
 	err = sock.Send([]byte(nil), 0)
 	return err
-}
-
-func (self *GOMQ) handle(buff []byte) {
-	buff, err := self.decrypt(buff)
-	if err != nil {
-		log.Println("GOMQ:handle:decrypt", err)
-		return
-	}
-	msg, err := decodeMessage(buff)
-	if err != nil {
-		log.Println("GOMQ:handle:decodeMessage", err)
-	} else {
-		job := self.getJob(msg.Job)
-		job(msg.Params)
-	}
 }
 
 func (self *GOMQ) Loop(host string, sock_type zmq.SocketType) error {
@@ -183,16 +157,62 @@ func (self *GOMQ) Loop(host string, sock_type zmq.SocketType) error {
 	return nil
 }
 
-func (self *GOMQ) AddJob(job string, action Pfunc) {
-	self.jobs[job] = action
+func (self *GOMQ) Close() {
+	for _, sock_infos := range self.connections {
+		sock_infos.Sock.Close()
+		sock_infos.Sock = nil
+	}
+	self.context.Close()
+}
+
+func (self *GOMQ) AddWorker() {
+	self.lock.Add(1)
+}
+
+func (self *GOMQ) FreeWorker() {
+	self.lock.Done()
+}
+
+func (self *GOMQ) Wait() {
+	self.lock.Wait()
+}
+
+func (self *GOMQ) handle(buff []byte) {
+	buff, err := self.decrypt(buff)
+	if err != nil {
+		log.Println("GOMQ:handle:decrypt", err)
+		return
+	}
+	msg, err := decodeMessage(buff)
+	if err != nil {
+		log.Println("GOMQ:handle:decodeMessage", err)
+	} else {
+		job := self.getJob(msg.Job)
+		job(msg.Params)
+	}
 }
 
 func (self *GOMQ) getJob(job string) Pfunc {
 	return self.jobs[job]
 }
 
-func (self *GOMQ) SetMasterKey(key []byte) {
-	_, self.key = _PBKDF2_SHA256(key, []byte(_SALT))
+func (self *GOMQ) createSock(sock_infos *_ConnectionInfo) (*zmq.Socket, error) {
+	if sock_infos.Sock == nil {
+		sock, err := self.context.NewSocket(sock_infos.Type)
+		if err != nil {
+			return nil, err
+		}
+		for e := sock_infos.Host.Front(); e != nil; e = e.Next() {
+			err := sock.Connect(e.Value.(string))
+			if err != nil {
+				return nil, err
+			}
+		}
+		sock_infos.Sock = sock
+		return sock, nil
+	} else {
+		return sock_infos.Sock, nil
+	}
 }
 
 func (self *GOMQ) encrypt(data []byte) ([]byte, error) {
@@ -253,24 +273,4 @@ func (self *GOMQ) decrypt(buff []byte) ([]byte, error) {
 		return nil, errors.New("GOMQ:decrypt:HMAC check fail")
 	}
 	return plaintext, nil
-}
-
-func (self *GOMQ) Close() {
-	for _, sock_infos := range self.connections {
-		sock_infos.Sock.Close()
-		sock_infos.Sock = nil
-	}
-	self.context.Close()
-}
-
-func (self *GOMQ) AddWorker() {
-	self.lock.Add(1)
-}
-
-func (self *GOMQ) FreeWorker() {
-	self.lock.Done()
-}
-
-func (self *GOMQ) Wait() {
-	self.lock.Wait()
 }

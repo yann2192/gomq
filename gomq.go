@@ -108,7 +108,7 @@ func (self *GOMQ) SetMasterKey(key []byte) {
 }
 
 // Send a job on the connection identified by connection_name to execute the
-// task identified by the strnig job which will take params to argument.
+// task identified by the string job which will take params as argument.
 func (self *GOMQ) SendJob(connection_name, job string, params Args) error {
 	uuid, err := newUUID()
 	if err != nil {
@@ -142,9 +142,12 @@ func (self *GOMQ) SendJob(connection_name, job string, params Args) error {
 	return err
 }
 
+// This loop will listen of the given host all incoming connections.
+// It receive incoming job and launch them.
 func (self *GOMQ) Loop(host string, sock_type zmq.SocketType) error {
-	self.AddWorker()
-	defer self.FreeWorker()
+	self.AddTask()
+	defer self.FreeTask()
+
 	s, err := self.context.NewSocket(sock_type)
 	if err != nil {
 		return err
@@ -154,6 +157,7 @@ func (self *GOMQ) Loop(host string, sock_type zmq.SocketType) error {
 		return err
 	}
 
+    // Receive killing signals.
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, os.Kill, os.Signal(syscall.SIGTERM))
 	go func() {
@@ -178,6 +182,7 @@ func (self *GOMQ) Loop(host string, sock_type zmq.SocketType) error {
 	return nil
 }
 
+// Close all opens connections.
 func (self *GOMQ) Close() {
 	for _, sock_infos := range self.connections {
 		sock_infos.Sock.Close()
@@ -186,14 +191,17 @@ func (self *GOMQ) Close() {
 	self.context.Close()
 }
 
-func (self *GOMQ) AddWorker() {
+// Register a task. Wait() wait all registered tasks.
+func (self *GOMQ) AddTask() {
 	self.lock.Add(1)
 }
 
-func (self *GOMQ) FreeWorker() {
+// Unregister a task.
+func (self *GOMQ) FreeTask() {
 	self.lock.Done()
 }
 
+// Wait all registered tasks.
 func (self *GOMQ) Wait() {
 	self.lock.Wait()
 }

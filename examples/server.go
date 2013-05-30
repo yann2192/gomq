@@ -8,8 +8,8 @@ import (
 var _GOMQ *gomq.GOMQ
 
 func a(args gomq.Args) {
-	_GOMQ.AddWorker()
-	defer _GOMQ.FreeWorker()
+	_GOMQ.AddTask()
+	defer _GOMQ.FreeTask()
 	log.Println(">", args.(string), "<")
 }
 

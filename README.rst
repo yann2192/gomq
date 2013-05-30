@@ -34,8 +34,8 @@ Daemon
     var _GOMQ *gomq.GOMQ
 
     func a(b gomq.Args) {
-        _GOMQ.AddWorker()
-        defer _GOMQ.FreeWorker()
+        _GOMQ.AddTask()
+        defer _GOMQ.FreeTask()
         log.Println(">", b.(string), "<")
         time.Sleep(time.Second)
     }

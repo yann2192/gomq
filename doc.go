@@ -6,11 +6,11 @@
 /*
 A fast and lightweight distributed Task Queue using ØMQ.
 
-GOMQ provide an easy, fast and secure way to send order on various network
-schemas to execute task efficiently on remote hosts.
+GOMQ provides an easy, fast, and secure way to send orders on various network
+schemas to execute tasks efficiently on remote hosts.
 
 GOMQ contains defined task identified by a string. It can bind like
-a daemon or connect to others daemons (or both). GOMQ use only encrypted
+a daemon or connect to other daemons (or both). GOMQ uses only encrypted
 connections using AES. All incoming or outcoming connections are ØMQ connections
 so a connection must only send (using gomq.PUSH) or receive (using gomq.PULL).
 A connection can be connected to multiple hosts.
@@ -76,7 +76,7 @@ Client example:
 
 
 
-Requirements :
+Requirements:
 
     * gozmq (https://github.com/alecthomas/gozmq)
     * pbkdf2 (https://code.google.com/p/go.crypto/pbkdf2)

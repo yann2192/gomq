@@ -230,7 +230,7 @@ func (self *GOMQ) createSock(sock_infos *_ConnectionInfo) (*zmq.Socket, error) {
 		if err != nil {
 			return nil, err
 		}
-        // Connect to each host.
+		// Connect to each host.
 		for e := sock_infos.Host.Front(); e != nil; e = e.Next() {
 			err := sock.Connect(e.Value.(string))
 			if err != nil {

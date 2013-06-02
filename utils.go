@@ -13,7 +13,7 @@ import (
 	"io"
 )
 
-// Encode a struct _Message in binary
+// Encodes a struct _Message into binary.
 func encodeMessage(data *_Message) ([]byte, error) {
 	var buffer bytes.Buffer
 	encoder := gob.NewEncoder(&buffer)
@@ -24,7 +24,7 @@ func encodeMessage(data *_Message) ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-// Decode a encoded _Message
+// Decodes an encoded _Message.
 func decodeMessage(data []byte) (*_Message, error) {
 	var buffer bytes.Buffer
 	res := new(_Message)
@@ -37,7 +37,7 @@ func decodeMessage(data []byte) (*_Message, error) {
 	return res, nil
 }
 
-// Take here : http://play.golang.org/p/4FkNSiUDMg
+// Taken here: http://play.golang.org/p/4FkNSiUDMg
 // newUUID generates a random UUID according to RFC 4122
 func newUUID() (string, error) {
 	uuid := make([]byte, 16)

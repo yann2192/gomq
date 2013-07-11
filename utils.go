@@ -8,15 +8,17 @@ package gomq
 import (
 	"bytes"
 	"crypto/rand"
-	"encoding/gob"
 	"fmt"
+	"github.com/ugorji/go/codec"
 	"io"
 )
+
+var mh codec.MsgpackHandle
 
 // Encodes a struct _Message into binary.
 func encodeMessage(data *_Message) ([]byte, error) {
 	var buffer bytes.Buffer
-	encoder := gob.NewEncoder(&buffer)
+	encoder := codec.NewEncoder(&buffer, &mh)
 	err := encoder.Encode(*data)
 	if err != nil {
 		return nil, err
@@ -29,7 +31,8 @@ func decodeMessage(data []byte) (*_Message, error) {
 	var buffer bytes.Buffer
 	res := new(_Message)
 	buffer.Write(data)
-	decoder := gob.NewDecoder(&buffer)
+	mh.RawToString = true
+	decoder := codec.NewDecoder(&buffer, &mh)
 	err := decoder.Decode(res)
 	if err != nil {
 		return nil, err

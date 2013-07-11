@@ -51,10 +51,10 @@ type Pfunc func(Args)
 
 // Contains all information for launching a task.
 type _Message struct {
-	Job      string
-	UUID     string // Not used yet.
-	Params   Args
-	Priority uint // Not used yet.
+	Job      string `codec:"job"`
+	UUID     string `codec:"uuid"` // Not used yet.
+	Params   Args   `codec:"params"`
+	Priority uint   `codec:"priority"` // Not used yet.
 }
 
 // Creates and initializes a new _Message.
@@ -115,14 +115,16 @@ func (self *GOMQ) SendJob(connection_name, job string, params Args) error {
 	if err != nil {
 		return err
 	}
-	msg := newMessage(job, uuid, params, 0)
+	msg := newMessage(job, uuid, params, 3)
 	buff, err := encodeMessage(msg)
 	if err != nil {
 		return err
 	}
-	buff, err = self.encrypt(buff)
-	if err != nil {
-		return err
+	if self.key != nil {
+		buff, err = self.encrypt(buff)
+		if err != nil {
+			return err
+		}
 	}
 	for i := 0; i < len(buff); i += 4096 {
 		limit := i + 4096
@@ -204,10 +206,13 @@ func (self *GOMQ) Wait() {
 
 // Handles received messages and executes the associated task.
 func (self *GOMQ) handle(buff []byte) {
-	buff, err := self.decrypt(buff)
-	if err != nil {
-		log.Println("GOMQ:handle:decrypt", err)
-		return
+	var err error
+	if self.key != nil {
+		buff, err = self.decrypt(buff)
+		if err != nil {
+			log.Println("GOMQ:handle:decrypt", err)
+			return
+		}
 	}
 	msg, err := decodeMessage(buff)
 	if err != nil {

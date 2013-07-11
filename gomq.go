@@ -105,7 +105,7 @@ func (self *GOMQ) SetMasterKey(key []byte) {
 
 // Sends a job on the connection identified by connection_name to execute the
 // task identified by the string job which will take params as argument.
-func (self *GOMQ) SendJob(connection_name, job string, params Args) error {
+func (self *GOMQ) SendJob(connection_name, job string, params Args, priority uint) error {
 	uuid, err := newUUID()
 	if err != nil {
 		return err
@@ -115,7 +115,7 @@ func (self *GOMQ) SendJob(connection_name, job string, params Args) error {
 	if err != nil {
 		return err
 	}
-	msg := newMessage(job, uuid, params, 3)
+	msg := newMessage(job, uuid, params, priority)
 	buff, err := encodeMessage(msg)
 	if err != nil {
 		return err
